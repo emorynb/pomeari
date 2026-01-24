@@ -5,7 +5,7 @@ from typing import Any
 import click
 import frontmatter
 
-from .db import get_favorite_platform, inc_and_get_run_id, log_post
+from .db import get_favorite_platform, inc_and_get_run_id, log_post, log_run
 from .ep import discover_platforms
 from .types import ModuleInfo, PostForm, XpostResult
 
@@ -35,6 +35,18 @@ async def post_to_platforms(
 
     favorite_name = await get_favorite_platform()
     run_id = await inc_and_get_run_id()
+
+    if post_form == PostForm.SHORT:
+        post = content
+        run_caption = content[:20].rstrip()  # not the best solution but meh
+    else:
+        post = frontmatter.loads(content)
+        run_caption: str = post["title"] if "title" in post else content[:20].rstrip()  # pyright: ignore
+
+    try:
+        await log_run(run_id, run_caption)
+    except Exception as e:
+        logging.warning("Failed to log run #%d: %s", run_id, e)
 
     for name, platform in platforms.items():
         info: ModuleInfo = platform.info
@@ -70,12 +82,7 @@ async def post_to_platforms(
         # favorite runs *outside* gather
         if name == favorite_name:
             try:
-                fav_coro = handler(
-                    content
-                    if post_form == PostForm.SHORT
-                    else frontmatter.loads(content),
-                    stripped_config,
-                )
+                fav_coro = handler(post, stripped_config)
                 fav_result = await _wrap(run_id, display_name, fav_coro)
             except Exception as e:
                 fav_result = e
@@ -83,12 +90,7 @@ async def post_to_platforms(
             coros[display_name] = _wrap(
                 run_id,
                 display_name,
-                handler(
-                    content
-                    if post_form == PostForm.SHORT
-                    else frontmatter.loads(content),
-                    stripped_config,
-                ),
+                handler(post, stripped_config),
             )
 
     results = await asyncio.gather(*coros.values(), return_exceptions=True)

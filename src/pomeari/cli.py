@@ -3,6 +3,8 @@ from typing import Any
 
 import click
 
+from pomeari.db import get_run_logs
+
 from .types import PostForm
 
 
@@ -203,19 +205,20 @@ def logs(max_count: int):
 
     from .db import get_post_logs, init_db
 
-    def _format_logs(entries: list[dict[str, Any]]) -> str:
+    def _format_logs(
+        entries: list[dict[str, Any]], run_captions: dict[int, Any]
+    ) -> str:
         runs: dict[int, list[dict]] = defaultdict(list)
-
         for entry in entries:
             runs[entry["id"]].append(entry)
 
         lines: list[str] = []
 
         for run_id in sorted(runs, reverse=True):
-            lines.append(f"Run #{run_id}:")
+            lines.append(f'Run #{run_id} ("{run_captions.get(run_id, "???")}"):')
 
             for entry in runs[run_id]:
-                lines.append(f"  - Platform: {entry['platform']}")
+                lines.append(f" ~> Platform: {entry['platform']}")
                 lines.append(f"    URL: {entry['url']}")
                 lines.append(f"    Created at: {entry['created_at']}")
                 if entry["metadata"]:
@@ -229,7 +232,8 @@ def logs(max_count: int):
     async def main():
         await init_db()
         entries = await get_post_logs(max_count)
-        click.echo_via_pager(_format_logs(entries))
+        run_log = await get_run_logs(max_count)  # an acceptable overestimation
+        click.echo_via_pager(_format_logs(entries, run_log))
 
     asyncio.run(main())
 

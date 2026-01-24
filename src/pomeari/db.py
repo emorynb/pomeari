@@ -23,6 +23,7 @@ async def init_db():
     """
     oschmod.set_mode(str(DB_PATH), 0o600)
     async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("PRAGMA foreign_keys = ON;")
         await db.execute("""
         CREATE TABLE IF NOT EXISTS config (
             key TEXT PRIMARY KEY,
@@ -30,13 +31,23 @@ async def init_db():
         );
         """)
         await db.execute("""
+        CREATE TABLE IF NOT EXISTS run_log (
+            id INTEGER PRIMARY KEY, -- run_id
+            caption TEXT NOT NULL
+        );
+        """)
+        await db.execute("""
         CREATE TABLE IF NOT EXISTS post_log (
             rowid INTEGER PRIMARY KEY,
-            id INTEGER NOT NULL,
+            id INTEGER NOT NULL, -- run_id
             platform TEXT NOT NULL,
             url TEXT NOT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            metadata TEXT DEFAULT ''
+            metadata TEXT DEFAULT '',
+            FOREIGN KEY (id)
+            REFERENCES run_log(id)
+                ON DELETE CASCADE
+                ON UPDATE CASCADE
         );
         """)
         await db.execute("""
@@ -115,6 +126,18 @@ async def inc_and_get_run_id() -> int:
         return row[0]  # pyright: ignore
 
 
+async def log_run(run_id: int, caption: str):
+    """
+    Log the current crossposting run in the DB.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO run_log (id, caption) VALUES (?, ?)",
+            (run_id, caption),
+        )
+        await db.commit()
+
+
 async def log_post(run_id: int, platform_name: str, result: XpostResult):
     """
     Log what has just been crossposted (to where, and optionally how) in the DB.
@@ -145,6 +168,20 @@ async def get_post_logs(limit: int = 100) -> list[dict[str, Any]]:
         async with db.execute(query, (limit,)) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+
+async def get_run_logs(limit: int = 100) -> dict[int, Any]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        query = """
+            SELECT id, caption
+            FROM run_log
+            ORDER BY id DESC
+            LIMIT ?
+        """
+        async with db.execute(query, (limit,)) as cursor:
+            rows = await cursor.fetchall()
+            return {row["id"]: row["caption"] for row in rows}
 
 
 async def get_favorite_platform() -> str:
