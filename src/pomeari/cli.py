@@ -28,15 +28,18 @@ def config():
     pass
 
 
-@config.command("add")
+@config.command("set")
 @click.argument("key")
 @click.argument("value")
-def add(key, value):
+def set(key, value):
     """Add/replace a configuration entry."""
-    from .db import add_conf
+    from .db import set_conf
 
-    asyncio.run(add_conf(key, value))
-    click.echo(f"Added config key: {key}")
+    asyncio.run(set_conf(key, value))
+    click.echo(f"Set config key {key} to {value}")
+
+
+config.add_command(set, name="add")
 
 
 @config.command("rm")
@@ -51,13 +54,13 @@ def rm(key):
 
 @cli.group(invoke_without_command=True)
 @click.pass_context
-def platforms(ctx):
+def platform(ctx):
     """Manage platforms"""
     if ctx.invoked_subcommand is None:
         ctx.invoke(list)
 
 
-@platforms.command("list")
+@platform.command("list")
 def listcmd():
     """List available platforms"""
     from .ep import discover_platforms
@@ -75,7 +78,7 @@ def listcmd():
     click.echo_via_pager("\n".join(lines))
 
 
-@platforms.command("favorite")
+@platform.command("favorite")
 @click.argument("platform", required=False)
 def favorite(platform: str | None):
     """Get or set the favorite platform"""

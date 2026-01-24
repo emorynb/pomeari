@@ -75,7 +75,7 @@ async def init_db():
         await db.commit()
 
 
-async def add_conf(key: str, value: str):
+async def set_conf(key: str, value: str):
     """
     Add an entry to the config table or modify it.
     """
