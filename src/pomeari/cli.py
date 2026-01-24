@@ -56,7 +56,7 @@ def platforms(ctx):
 
 
 @platforms.command("list")
-def list():
+def listcmd():
     """List available platforms"""
     from .ep import discover_platforms
 
@@ -193,25 +193,43 @@ def long(file_input, stdin, edit):
     _post_content(PostForm.LONG, content)
 
 
-def _format_logs(entry: dict[str, Any]) -> str:
-    arr = []
-    for v in entry.values():
-        arr.append(str(v))
-    return " ".join(arr)
-
-
 @post.command
 @click.option(
     "-n", "--max-count", default=10, help="Max number of log entries to show."
 )
 def logs(max_count: int):
     """Show last 100 (or specified) logged crossposts."""
+    from collections import defaultdict
+
     from .db import get_post_logs, init_db
+
+    def _format_logs(entries: list[dict[str, Any]]) -> str:
+        runs: dict[int, list[dict]] = defaultdict(list)
+
+        for entry in entries:
+            runs[entry["id"]].append(entry)
+
+        lines: list[str] = []
+
+        for run_id in sorted(runs, reverse=True):
+            lines.append(f"Run #{run_id}:")
+
+            for entry in runs[run_id]:
+                lines.append(f"  - Platform: {entry['platform']}")
+                lines.append(f"    URL: {entry['url']}")
+                lines.append(f"    Created at: {entry['created_at']}")
+                if entry["metadata"]:
+                    lines.append(f"    Metadata: {entry['metadata']}")
+                lines.append("")
+
+            lines.append("")
+
+        return "\n".join(lines).rstrip()
 
     async def main():
         await init_db()
         entries = await get_post_logs(max_count)
-        click.echo_via_pager("\n".join(_format_logs(e) for e in entries))
+        click.echo_via_pager(_format_logs(entries))
 
     asyncio.run(main())
 
