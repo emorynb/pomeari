@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Any
 
 import aiosqlite
+import oschmod
 
 from .types import XpostResult
 
@@ -20,6 +21,7 @@ async def init_db():
     not on the helpers to ensure they're called, but on the one calling the
     helpers.
     """
+    oschmod.set_mode(str(DB_PATH), 0o600)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
         CREATE TABLE IF NOT EXISTS config (
