@@ -124,12 +124,10 @@ def _load_and_maybe_edit_content(
 
     if message is not None:
         content = message
-
     elif stdin:
         if click.get_text_stream("stdin").isatty():
             return None
         content = click.get_text_stream("stdin").read()
-
     elif file_input:
         with open(file_input, "r", encoding="utf-8") as f:
             content = f.read()
@@ -200,7 +198,7 @@ def long(file_input, stdin, edit):
 
 @post.command
 @click.option(
-    "-n", "--max-count", default=10, help="Max number of log entries to show."
+    "-n", "--max-count", default=100, help="Max number of log entries to show."
 )
 def logs(max_count: int):
     """Show last 100 (or specified) logged crossposts."""
