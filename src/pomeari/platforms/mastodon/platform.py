@@ -11,7 +11,6 @@ usage. All other platform modules should be placed in external packages.
 from datetime import datetime
 from typing import Any
 
-from frontmatter import Post
 from httpx import AsyncClient
 
 from pomeari.platforms.base import Platform
@@ -74,6 +73,3 @@ class MastodonPlatform(Platform):
         ).isoformat()
 
         return XpostResult(url=data["url"], created_at=created_at)
-
-    async def post_long(self, post: Post, config: dict[str, Any]) -> XpostResult:
-        raise NotImplementedError

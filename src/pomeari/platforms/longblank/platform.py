@@ -11,9 +11,6 @@ from pomeari.types import ModuleInfo, XpostResult
 class LongBlankPlatform(Platform):
     info = ModuleInfo(title="Long&Blank")
 
-    async def post_short(self, content: str, config: dict[str, Any]) -> XpostResult:
-        raise NotImplementedError
-
     async def post_long(self, post: Post, config: dict[str, Any]) -> XpostResult:
         print(post)
         print(post.metadata)
