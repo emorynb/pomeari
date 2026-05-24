@@ -26,14 +26,22 @@ async def _wrap(run_id: int, display_name: str, coro: Any):
     return result
 
 
+async def _raise_ni(*_, **__):
+    raise NotImplementedError
+
+
 async def post_to_platforms(
     post_form: PostForm, content: str, config: dict
 ) -> dict[str, XpostResult | Exception]:
     platforms = discover_platforms()
-    coros: dict[str, Any] = {}
-    fav_result: XpostResult | Exception | None = None
-
     favorite_name = await get_favorite_platform()
+
+    if favorite_name not in platforms:
+        raise click.ClickException(
+            f"Favorite platform '{favorite_name}' is not available. "
+            "It may have been uninstalled."
+        )
+
     run_id = await inc_and_get_run_id()
 
     if post_form == PostForm.SHORT:
@@ -48,13 +56,13 @@ async def post_to_platforms(
     except Exception as e:
         logging.warning("Failed to log run #%d: %s", run_id, e)
 
+    # validate configs for all platforms upfront
+    stripped_configs: dict[str, dict[str, str]] = {}
     for name, platform in platforms.items():
-        info: ModuleInfo = platform.info
-        config_keys = info.config_keys
-
+        info = platform.info
         missing = [
             c
-            for c in config_keys
+            for c in info.config_keys
             if (c.required or c.default is None) and c.key not in config
         ]
         if missing:
@@ -65,42 +73,75 @@ async def post_to_platforms(
             raise click.ClickException(
                 "\n".join(excstrs + ["\nAdd them via `pomeari config add key value`!"])
             )
+        stripped_configs[name] = {
+            k.key: config.get(k.key, k.default) for k in info.config_keys
+        }
 
-        stripped_config = {k.key: config.get(k.key, k.default) for k in config_keys}
+    if post_form == PostForm.LONG:
+        if not platforms[favorite_name].supports_post_long():
+            raise click.ClickException(
+                f"Favorite platform '{platforms[favorite_name].info.title}' "
+                "does not support long-form posts. "
+                "Set a long-form-capable platform as your favorite."
+            )
 
-        handler_attr = f"post_{post_form}"
-        handler = getattr(platform, handler_attr, None)
-        if handler is None:
+    # run favorite platform first
+    fav_platform = platforms[favorite_name]
+    fav_display = f"{fav_platform.info.title} ({favorite_name})"
 
-            async def raise_ni(*_, **__):
-                raise NotImplementedError
+    if post_form == PostForm.LONG:
+        fav_handler = fav_platform.post_long
+        fav_args = (post, stripped_configs[favorite_name])
+    else:
+        fav_handler = fav_platform.post_short
+        fav_args = (post, stripped_configs[favorite_name])
 
-            handler = raise_ni
+    fav_result: XpostResult | Exception | None = None
+    try:
+        fav_result = await _wrap(run_id, fav_display, fav_handler(*fav_args))
+    except Exception as e:
+        fav_result = e
 
-        display_name = f"{info.title} ({name})"
-
-        # favorite runs *outside* gather
+    # build coros for remaining platforms
+    coros: dict[str, Any] = {}
+    for name, platform in platforms.items():
         if name == favorite_name:
-            try:
-                fav_coro = handler(post, stripped_config)
-                fav_result = await _wrap(run_id, display_name, fav_coro)
-            except Exception as e:
-                fav_result = e
+            continue
+
+        display_name = f"{platform.info.title} ({name})"
+        stripped = stripped_configs[name]
+
+        if post_form == PostForm.LONG and not platform.supports_post_long():
+            if isinstance(fav_result, XpostResult):
+                relay_content = f"{run_caption}\n\n{fav_result.url}"
+                coros[display_name] = _wrap(
+                    run_id,
+                    display_name,
+                    platform.post_short(relay_content, stripped),
+                )
+            else:
+                logging.warning(
+                    "Relay skipped for %s — favorite platform returned: %s",
+                    display_name, fav_result
+                )
+                coros[display_name] = _wrap(
+                    run_id, display_name, _raise_ni()
+                )
         else:
+            if post_form == PostForm.LONG:
+                handler = platform.post_long
+                handler_args = (post, stripped)
+            else:
+                handler = platform.post_short
+                handler_args = (post, stripped)
+
             coros[display_name] = _wrap(
-                run_id,
-                display_name,
-                handler(post, stripped_config),
+                run_id, display_name, handler(*handler_args)
             )
 
     results = await asyncio.gather(*coros.values(), return_exceptions=True)
-
-    # build final mapping and insert favorite at front
     combined: dict[str, XpostResult | Exception] = dict(zip(coros.keys(), results))  # pyright: ignore
     if fav_result is not None:
-        combined = {
-            f"{platforms[favorite_name].info.title} ({favorite_name})": fav_result,
-            **combined,
-        }
+        combined = {fav_display: fav_result, **combined}
 
     return combined

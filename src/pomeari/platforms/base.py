@@ -23,6 +23,9 @@ class Platform(ABC):  # no real reason to inherit from ABC here but whatever
                 f"{cls.__name__} must override at least one of `post_short` or `post_long`"
             )
 
+    def supports_post_long(self) -> bool:
+        return type(self).post_long is not Platform.post_long
+
     async def post_short(self, content: str, config: dict[str, str]) -> XpostResult:
         raise NotImplementedError
 
