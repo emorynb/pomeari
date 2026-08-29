@@ -1,147 +1,288 @@
 import asyncio
 import logging
-from typing import Any
+from collections.abc import Awaitable, Iterable, Mapping
 
-import click
 import frontmatter
 
-from .db import get_favorite_platform, inc_and_get_run_id, log_post, log_run
-from .ep import discover_platforms
-from .types import ModuleInfo, PostForm, XpostResult
+from .db import Database
+from .errors import (
+    FavoritePlatformError,
+    InvalidPostError,
+    MissingConfigEntry,
+    MissingConfigurationError,
+    PlatformNotFoundError,
+)
+from .platforms.base import Platform
+from .types import (
+    PlatformPublishResult,
+    PostForm,
+    PublishRequest,
+    PublishResult,
+    PublishStatus,
+    XpostResult,
+)
 
 
-async def _wrap(run_id: int, display_name: str, coro: Any):
-    try:
-        result = await coro
-    except NotImplementedError as e:
-        raise e  # just silently pass
-    except Exception as e:
-        logging.warning("Failed to post for %s: %s", display_name, e)
-        raise e
-
-    try:
-        await log_post(run_id, display_name, result)
-    except Exception as e:
-        logging.warning("Failed to log post for %s: %s", display_name, e)
-    return result
+def _platform_title(name: str, platform: Platform) -> str:
+    return platform.info.title or name
 
 
-async def _raise_ni(*_, **__):
-    raise NotImplementedError
+def _selected_platforms(
+    request: PublishRequest,
+    platforms: Mapping[str, Platform],
+) -> list[str]:
+    if request.targets is None:
+        if request.post_form == PostForm.SHORT:
+            return [
+                name
+                for name, platform in platforms.items()
+                if platform.supports_post_short()
+            ]
+        return list(platforms)
+
+    selected = []
+    for name in request.targets:
+        if name not in platforms:
+            raise PlatformNotFoundError(name)
+        if name not in selected:
+            selected.append(name)
+
+    if not selected:
+        raise InvalidPostError("Select at least one platform before publishing.")
+
+    return selected
 
 
-async def post_to_platforms(
-    post_form: PostForm, content: str, config: dict
-) -> dict[str, XpostResult | Exception]:
-    platforms = discover_platforms()
-    favorite_name = await get_favorite_platform()
+def _validate_favorite(
+    request: PublishRequest,
+    platforms: Mapping[str, Platform],
+    selected: list[str],
+    favorite_name: str,
+):
+    if request.post_form != PostForm.LONG:
+        return
 
     if favorite_name not in platforms:
-        raise click.ClickException(
+        raise FavoritePlatformError(
             f"Favorite platform '{favorite_name}' is not available. "
             "It may have been uninstalled."
         )
 
-    run_id = await inc_and_get_run_id()
+    if favorite_name not in selected:
+        raise FavoritePlatformError(
+            f"Favorite platform '{favorite_name}' must be selected for a long post."
+        )
 
-    if post_form == PostForm.SHORT:
-        post = content
-        run_caption = content[:20].rstrip()  # not the best solution but meh
-    else:
-        post = frontmatter.loads(content)
-        run_caption: str = (
-            post["title"] if "title" in post else content[:20].rstrip()
-        )  # pyright: ignore
+    favorite = platforms[favorite_name]
+    if not favorite.supports_post_long():
+        title = _platform_title(favorite_name, favorite)
+        raise FavoritePlatformError(
+            f"Favorite platform '{title}' does not support long-form posts."
+        )
+
+
+def _platform_configs(
+    selected: Iterable[str],
+    platforms: Mapping[str, Platform],
+    config: Mapping[str, str],
+) -> dict[str, dict[str, str]]:
+    missing = []
+    stripped_configs = {}
+
+    for name in selected:
+        platform = platforms[name]
+        title = _platform_title(name, platform)
+        stripped = {}
+
+        for entry in platform.info.config_keys:
+            has_value = entry.key in config
+            needs_value = entry.required or entry.default is None
+            if not has_value and needs_value:
+                missing.append(
+                    MissingConfigEntry(
+                        platform=name,
+                        platform_title=title,
+                        key=entry.key,
+                        description=entry.description,
+                    )
+                )
+                continue
+            value = config.get(entry.key, entry.default)
+            if value is None:
+                continue
+            stripped[entry.key] = value
+
+        stripped_configs[name] = stripped
+
+    if missing:
+        raise MissingConfigurationError(missing)
+
+    return stripped_configs
+
+
+def _caption(request: PublishRequest) -> tuple[str, str | frontmatter.Post]:
+    if not request.content.strip():
+        raise InvalidPostError("Post content cannot be empty.")
+
+    if request.post_form == PostForm.SHORT:
+        caption = request.content[:20].rstrip()
+        return caption, request.content
 
     try:
-        await log_run(run_id, run_caption)
-    except Exception as e:
-        logging.warning("Failed to log run #%d: %s", run_id, e)
+        post = frontmatter.loads(request.content)
+    except Exception as error:
+        raise InvalidPostError(
+            f"Unable to parse the long-form post: {error}"
+        ) from error
 
-    # validate configs for all platforms upfront
-    stripped_configs: dict[str, dict[str, str]] = {}
-    for name, platform in platforms.items():
-        info = platform.info
-        missing = [
-            c
-            for c in info.config_keys
-            if (c.required or c.default is None) and c.key not in config
+    title = post.metadata.get("title")
+    if isinstance(title, str) and title.strip():
+        return title.strip(), post
+
+    return request.content[:20].rstrip(), post
+
+
+async def _run_handler(
+    run_id: int,
+    name: str,
+    platform: Platform,
+    handler: Awaitable[XpostResult],
+    database: Database,
+) -> PlatformPublishResult:
+    title = _platform_title(name, platform)
+
+    try:
+        result = await handler
+    except NotImplementedError:
+        return PlatformPublishResult(
+            platform=name,
+            title=title,
+            status=PublishStatus.SKIPPED,
+            error="This platform does not support the requested post form.",
+        )
+    except Exception as error:
+        logging.warning("Failed to post for %s: %s", title, error)
+        return PlatformPublishResult(
+            platform=name,
+            title=title,
+            status=PublishStatus.FAILED,
+            error=str(error),
+        )
+
+    try:
+        await database.log_post(run_id, name, result)
+    except Exception as error:
+        logging.warning("Failed to log post for %s: %s", title, error)
+
+    return PlatformPublishResult(
+        platform=name,
+        title=title,
+        status=PublishStatus.SUCCESS,
+        result=result,
+    )
+
+
+async def publish_to_platforms(
+    request: PublishRequest,
+    platforms: Mapping[str, Platform],
+    favorite_name: str,
+    config: Mapping[str, str],
+    database: Database,
+) -> PublishResult:
+    selected = _selected_platforms(request, platforms)
+    if not selected:
+        raise InvalidPostError("No compatible platforms are available.")
+
+    _validate_favorite(request, platforms, selected, favorite_name)
+    config_targets = selected
+    if request.post_form == PostForm.SHORT:
+        config_targets = [
+            name for name in selected if platforms[name].supports_post_short()
         ]
-        if missing:
-            excstrs = [
-                f"{info.title}: missing config entry '{c.key}' ({c.description})"
-                for c in missing
-            ]
-            raise click.ClickException(
-                "\n".join(excstrs + ["\nAdd them via `pomeari config add key value`!"])
-            )
-        stripped_configs[name] = {
-            k.key: config.get(k.key, k.default) for k in info.config_keys
-        }
 
-    if post_form == PostForm.LONG:
-        if not platforms[favorite_name].supports_post_long():
-            raise click.ClickException(
-                f"Favorite platform '{platforms[favorite_name].info.title}' "
-                "does not support long-form posts. "
-                "Set a long-form-capable platform as your favorite."
-            )
+    platform_configs = _platform_configs(config_targets, platforms, config)
+    caption, post = _caption(request)
 
-    # run favorite platform first
-    fav_platform = platforms[favorite_name]
-    fav_display = f"{fav_platform.info.title} ({favorite_name})"
-
-    if post_form == PostForm.LONG:
-        fav_handler = fav_platform.post_long
-    else:
-        fav_handler = fav_platform.post_short
-
-    fav_args = (post, stripped_configs[favorite_name])
-    fav_result: XpostResult | Exception | None = None
+    run_id = await database.next_run_id()
     try:
-        fav_result = await _wrap(run_id, fav_display, fav_handler(*fav_args))
-    except Exception as e:
-        fav_result = e
+        await database.log_run(run_id, caption)
+    except Exception as error:
+        logging.warning("Failed to log run #%d: %s", run_id, error)
 
-    # build coros for remaining platforms
-    coros: dict[str, Any] = {}
-    for name, platform in platforms.items():
+    if request.post_form == PostForm.SHORT:
+        handlers = []
+        skipped_results = []
+        for name in selected:
+            platform = platforms[name]
+            if not platform.supports_post_short():
+                skipped_results.append(
+                    PlatformPublishResult(
+                        platform=name,
+                        title=_platform_title(name, platform),
+                        status=PublishStatus.SKIPPED,
+                        error="This platform does not support short-form posts.",
+                    )
+                )
+                continue
+            handlers.append(
+                _run_handler(
+                    run_id,
+                    name,
+                    platform,
+                    platform.post_short(post, platform_configs[name]),  # type: ignore[arg-type]
+                    database,
+                )
+            )
+
+        published_results = await asyncio.gather(*handlers)
+        unordered_results = [*published_results, *skipped_results]
+        results_by_platform = {result.platform: result for result in unordered_results}
+        ordered_results = [results_by_platform[name] for name in selected]
+        return PublishResult(run_id, caption, ordered_results)
+
+    favorite = platforms[favorite_name]
+    favorite_result = await _run_handler(
+        run_id,
+        favorite_name,
+        favorite,
+        favorite.post_long(post, platform_configs[favorite_name]),  # type: ignore[arg-type]
+        database,
+    )
+
+    remaining_handlers = []
+    skipped_results = []
+
+    for name in selected:
         if name == favorite_name:
             continue
 
-        display_name = f"{platform.info.title} ({name})"
-        stripped = stripped_configs[name]
-
-        if post_form == PostForm.LONG and not platform.supports_post_long():
-            if isinstance(fav_result, XpostResult):
-                relay_content = f"{run_caption}\n\n{fav_result.url}"
-                coros[display_name] = _wrap(
-                    run_id,
-                    display_name,
-                    platform.post_short(relay_content, stripped),
-                )
-            else:
-                logging.warning(
-                    "Relay skipped for %s — favorite platform returned: %s",
-                    display_name,
-                    fav_result,
-                )
-                coros[display_name] = _wrap(run_id, display_name, _raise_ni())
+        platform = platforms[name]
+        if platform.supports_post_long():
+            handler = platform.post_long(post, platform_configs[name])  # type: ignore[arg-type]
+        elif (
+            favorite_result.status == PublishStatus.SUCCESS
+            and favorite_result.result is not None
+        ):
+            relay_content = f"{caption}\n\n{favorite_result.result.url}"
+            handler = platform.post_short(relay_content, platform_configs[name])
         else:
-            if post_form == PostForm.LONG:
-                handler = platform.post_long
-                handler_args = (post, stripped)
-            else:
-                handler = platform.post_short
-                handler_args = (post, stripped)
+            skipped_results.append(
+                PlatformPublishResult(
+                    platform=name,
+                    title=_platform_title(name, platform),
+                    status=PublishStatus.SKIPPED,
+                    error="The primary long-form post failed, so its relay was skipped.",
+                )
+            )
+            continue
 
-            coros[display_name] = _wrap(run_id, display_name, handler(*handler_args))
+        remaining_handlers.append(
+            _run_handler(run_id, name, platform, handler, database)
+        )
 
-    results = await asyncio.gather(*coros.values(), return_exceptions=True)
-    combined: dict[str, XpostResult | Exception] = dict(
-        zip(coros.keys(), results)
-    )  # pyright: ignore
-    if fav_result is not None:
-        combined = {fav_display: fav_result, **combined}
+    remaining_results = await asyncio.gather(*remaining_handlers)
+    unordered_results = [favorite_result, *remaining_results, *skipped_results]
+    results_by_platform = {result.platform: result for result in unordered_results}
+    ordered_results = [results_by_platform[name] for name in selected]
 
-    return combined
+    return PublishResult(run_id, caption, ordered_results)

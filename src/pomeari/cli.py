@@ -1,23 +1,31 @@
 import asyncio
-from typing import Any
+from collections.abc import Awaitable, Iterable
+from importlib.metadata import version
+from typing import TypeVar
 
 import click
 
-from pomeari.db import get_run_logs
+from .errors import MissingConfigurationError, PomeariError
+from .service import PomeariService
+from .types import PostForm, PublishRequest, PublishStatus, RunLog
 
-from .types import PostForm
+T = TypeVar("T")
 
 
-def _read_version():
-    import tomllib
-
-    with open("pyproject.toml", "rb") as f:
-        pyproject = tomllib.load(f)
-    return pyproject["project"]["version"]
+def _run(operation: Awaitable[T]) -> T:
+    try:
+        return asyncio.run(operation)
+    except MissingConfigurationError as error:
+        message = (
+            f"{error}\n\nAdd the missing values with `pomeari config set KEY VALUE`."
+        )
+        raise click.ClickException(message) from error
+    except PomeariError as error:
+        raise click.ClickException(str(error)) from error
 
 
 @click.group
-@click.version_option(version=_read_version())
+@click.version_option(version=version("pomeari"))
 def cli():
     pass
 
@@ -31,24 +39,30 @@ def config():
 @config.command("set")
 @click.argument("key")
 @click.argument("value")
-def set(key, value):
-    """Add/replace a configuration entry."""
-    from .db import set_conf
+def set_config(key: str, value: str):
+    """Add or replace a configuration entry."""
 
-    asyncio.run(set_conf(key, value))
-    click.echo(f"Set config key {key} to {value}")
+    async def main():
+        async with PomeariService() as service:
+            await service.set_config(key, value)
+
+    _run(main())
+    click.echo(f"Set config key: {key}")
 
 
-config.add_command(set, name="add")
+config.add_command(set_config, name="add")
 
 
 @config.command("rm")
 @click.argument("key")
-def rm(key):
-    """Remove (clear) a configuration entry."""
-    from .db import rm_conf
+def remove_config(key: str):
+    """Remove a configuration entry."""
 
-    asyncio.run(rm_conf(key))
+    async def main():
+        async with PomeariService() as service:
+            await service.remove_config(key)
+
+    _run(main())
     click.echo(f"Removed config key: {key}")
 
 
@@ -56,60 +70,55 @@ def rm(key):
 @click.pass_context
 def platform(ctx):
     """Manage platforms"""
-    if ctx.invoked_subcommand is None:
-        ctx.invoke(list)
+    if not ctx.invoked_subcommand:
+        ctx.invoke(listcmd)
 
 
 @platform.command("list")
 def listcmd():
-    """List available platforms"""
-    from .ep import discover_platforms
+    """List available platforms."""
 
-    platforms = discover_platforms()
+    async def main():
+        async with PomeariService() as service:
+            return await service.list_platforms()
+
+    platforms = _run(main())
     if not platforms:
         click.echo("No platforms installed.")
         return
 
     lines = []
-    for name, platform in platforms.items():
-        title = platform.info.title or name
-        lines.append(f"{name}\t{title}")
-
+    for platform_info in platforms:
+        title = platform_info.module.title or platform_info.name
+        lines.append(f"{platform_info.name}\t{title}")
     click.echo_via_pager("\n".join(lines))
 
 
 @platform.command("favorite")
-@click.argument("platform", required=False)
-def favorite(platform: str | None):
-    """Get or set the favorite platform"""
-    from .db import get_favorite_platform, init_db, set_favorite_platform
-    from .ep import discover_platforms
+@click.argument("platform_name", required=False)
+def favorite(platform_name: str | None):
+    """Get or set the favorite platform."""
 
     async def main():
-        await init_db()
-        if platform is None:
-            fav = await get_favorite_platform()
-            click.echo(f"Selected favorite platform: {fav}")
-            return
+        async with PomeariService() as service:
+            if not platform_name:
+                return await service.get_favorite_platform()
 
-        platforms = discover_platforms()
-        if platform not in platforms:
-            raise click.ClickException(
-                f"Platform '{platform}' not found. "
-                f"Available: {', '.join(platforms.keys())}"
-            )
+            await service.set_favorite_platform(platform_name)
+            return platform_name
 
-        await set_favorite_platform(platform)
-        click.echo(f"Favorite platform set to: {platform}")
-
-    asyncio.run(main())
+    selected = _run(main())
+    if not platform_name:
+        click.echo(f"Selected favorite platform: {selected}")
+    else:
+        click.echo(f"Favorite platform set to: {selected}")
 
 
 @cli.group(invoke_without_command=True)
 @click.pass_context
 def post(ctx):
     """Post-related commands"""
-    if ctx.invoked_subcommand is None:
+    if not ctx.invoked_subcommand:
         ctx.invoke(short)
 
 
@@ -122,19 +131,19 @@ def _load_and_maybe_edit_content(
 ) -> str | None:
     content = ""
 
-    if message is not None:
+    if message:
         content = message
     elif stdin:
         if click.get_text_stream("stdin").isatty():
             return None
         content = click.get_text_stream("stdin").read()
     elif file_input:
-        with open(file_input, "r", encoding="utf-8") as f:
-            content = f.read()
+        with open(file_input, "r", encoding="utf-8") as file:
+            content = file.read()
 
     if edit or not content:
         edited = click.edit(content)
-        if edited is None:
+        if not edited:
             return None
         content = edited
 
@@ -144,26 +153,39 @@ def _load_and_maybe_edit_content(
     return content
 
 
-def _post_content(post_form: PostForm, content: str | None):
-    if content is None:
+def _post_content(
+    post_form: PostForm,
+    content: str | None,
+    targets: Iterable[str],
+):
+    if not content:
         click.echo("Aborted: empty post content.")
         return
 
-    from .db import init_db, load_config
-    from .posts import post_to_platforms
+    request_targets = targets or None
+    request = PublishRequest(
+        post_form=post_form,
+        content=content,
+        targets=request_targets,
+    )
 
     async def main():
-        await init_db()
-        config = await load_config()
-        click.echo("Posting to platforms...")
-        results = await post_to_platforms(post_form, content, config)
-        for mod, res in results.items():
-            if isinstance(res, Exception) or res is None:
-                # click.echo(f"{mod}: {res}")
-                continue
-            click.echo(f"{mod}: {res.url}")
+        async with PomeariService() as service:
+            return await service.publish(request)
 
-    asyncio.run(main())
+    click.echo("Posting to platforms...")
+    published = _run(main())
+
+    for result in published.platforms:
+        if result.status == PublishStatus.SUCCESS and result.result:
+            click.echo(f"{result.title} ({result.platform}): {result.result.url}")
+        elif result.status == PublishStatus.SKIPPED:
+            click.echo(f"{result.title} ({result.platform}): skipped ({result.error})")
+        else:
+            click.echo(
+                f"{result.title} ({result.platform}): failed ({result.error})",
+                err=True,
+            )
 
 
 @post.command
@@ -171,7 +193,14 @@ def _post_content(post_form: PostForm, content: str | None):
 @click.option("-m", "--message", help="Post content directly from the command line.")
 @click.option("--stdin", is_flag=True, help="Read post content from stdin.")
 @click.option("-e", "--edit", is_flag=True, help="Edit content before posting.")
-def short(file_input, message, stdin, edit):
+@click.option(
+    "-t",
+    "--target",
+    "targets",
+    multiple=True,
+    help="Post to this platform. Repeat to select multiple platforms.",
+)
+def short(file_input, message, stdin, edit, targets):
     """Post short-form content."""
     content = _load_and_maybe_edit_content(
         file_input=file_input,
@@ -179,122 +208,121 @@ def short(file_input, message, stdin, edit):
         stdin=stdin,
         edit=edit,
     )
-    _post_content(PostForm.SHORT, content)
+    _post_content(PostForm.SHORT, content, targets)
 
 
 @post.command
 @click.argument("file_input", required=False, type=click.Path(exists=True))
 @click.option("--stdin", is_flag=True, help="Read post content from stdin.")
 @click.option("-e", "--edit", is_flag=True, help="Edit content before posting.")
-def long(file_input, stdin, edit):
-    """Post short-form content."""
+@click.option(
+    "-t",
+    "--target",
+    "targets",
+    multiple=True,
+    help="Post to this platform. Repeat to select multiple platforms.",
+)
+def long(file_input, stdin, edit, targets):
+    """Post long-form content."""
     content = _load_and_maybe_edit_content(
         file_input=file_input,
         stdin=stdin,
         edit=edit,
     )
-    _post_content(PostForm.LONG, content)
+    _post_content(PostForm.LONG, content, targets)
+
+
+def _format_logs(history: Iterable[RunLog]) -> str:
+    lines = []
+    for run in history:
+        lines.append(f'Run #{run.id} ("{run.caption}"):')
+
+        for entry in run.posts:
+            lines.append(f" ~> Platform: {entry.platform}")
+            lines.append(f"    URL: {entry.url}")
+            lines.append(f"    Created at: {entry.created_at}")
+            if entry.metadata:
+                lines.append(f"    Metadata: {entry.metadata}")
+            lines.append("")
+
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
 
 
 @post.command
 @click.option(
-    "-n", "--max-count", default=100, help="Max number of log entries to show."
+    "-n",
+    "--max-count",
+    default=100,
+    type=click.IntRange(min=1),
+    help="Max number of posting runs to show.",
 )
 def logs(max_count: int):
-    """Show last 100 (or specified) logged crossposts."""
-    from collections import defaultdict
-
-    from .db import get_post_logs, init_db
-
-    def _format_logs(
-        entries: list[dict[str, Any]], run_captions: dict[int, Any]
-    ) -> str:
-        runs: dict[int, list[dict]] = defaultdict(list)
-        for entry in entries:
-            runs[entry["id"]].append(entry)
-
-        lines: list[str] = []
-
-        for run_id in sorted(runs, reverse=True):
-            lines.append(f'Run #{run_id} ("{run_captions.get(run_id, "???")}"):')
-
-            for entry in runs[run_id]:
-                lines.append(f" ~> Platform: {entry['platform']}")
-                lines.append(f"    URL: {entry['url']}")
-                lines.append(f"    Created at: {entry['created_at']}")
-                if entry["metadata"]:
-                    lines.append(f"    Metadata: {entry['metadata']}")
-                lines.append("")
-
-            lines.append("")
-
-        return "\n".join(lines).rstrip()
+    """Show recent crossposting runs."""
 
     async def main():
-        await init_db()
-        entries = await get_post_logs(max_count)
-        run_log = await get_run_logs(max_count)  # an acceptable overestimation
-        click.echo_via_pager(_format_logs(entries, run_log))
+        async with PomeariService() as service:
+            return await service.get_history(max_count)
 
-    asyncio.run(main())
+    history = _run(main())
+    click.echo_via_pager(_format_logs(history))
 
 
 @cli.group
 def reset():
-    """Reset (parts of) the local Pomeari database"""
+    """Reset parts of the local Pomeari database"""
     pass
 
 
 @reset.command("config")
 def reset_config():
     """Reset all Pomeari configuration entries."""
-    from .db import clear_table
-
     click.confirm(
-        "Are you sure you want to LOSE all your configuration entries FOREVER?",
-        abort=True,
-    )
-
-    asyncio.run(clear_table("config"))
-    click.echo(f"Reset all configuration entries.")
-
-
-@reset.command("logs")
-def reset_logs():
-    """Reset all Pomeari run/post log entries."""
-    from .db import clear_table
-
-    click.confirm(
-        "Are you sure you want to LOSE all your run and post logs FOREVER?",
+        "Are you sure you want to lose all your configuration entries forever?",
         abort=True,
     )
 
     async def main():
-        await clear_table("run_log")
-        await clear_table("post_log")
-        await clear_table("run_counter")
-        click.echo(f"Reset all run/post log entries.")
+        async with PomeariService() as service:
+            await service.clear_config()
 
-    asyncio.run(main())
+    _run(main())
+    click.echo("Reset all configuration entries.")
+
+
+@reset.command("logs")
+def reset_logs():
+    """Reset all Pomeari run and post log entries."""
+    click.confirm(
+        "Are you sure you want to lose all your run and post logs forever?",
+        abort=True,
+    )
+
+    async def main():
+        async with PomeariService() as service:
+            await service.clear_history()
+
+    _run(main())
+    click.echo("Reset all run and post log entries.")
 
 
 @reset.command("all")
 def reset_all():
     """Reset the entire Pomeari database."""
-    from pathlib import Path
-    from .db import DB_PATH, init_db
-
     click.confirm(
         "You're about to delete the entirety of your Pomeari database. "
-        "This includes all your configuration entries (API keys, settings...), "
-        "all your run and post logs, and your favorite platform choice.\n"
-        "Are you sure you're okay with that?",
+        "This includes all configuration entries, posting history, and your "
+        "favorite platform choice. Are you sure?",
         abort=True,
     )
 
-    DB_PATH.unlink(missing_ok=True)
-    asyncio.run(init_db())
-    click.echo(f"Reset the entire Pomeari database.")
+    async def main():
+        async with PomeariService() as service:
+            await service.reset_database()
+
+    _run(main())
+    click.echo("Reset the entire Pomeari database.")
 
 
 if __name__ == "__main__":
