@@ -91,11 +91,10 @@ async def post_to_platforms(
 
     if post_form == PostForm.LONG:
         fav_handler = fav_platform.post_long
-        fav_args = (post, stripped_configs[favorite_name])
     else:
         fav_handler = fav_platform.post_short
-        fav_args = (post, stripped_configs[favorite_name])
 
+    fav_args = (post, stripped_configs[favorite_name])
     fav_result: XpostResult | Exception | None = None
     try:
         fav_result = await _wrap(run_id, fav_display, fav_handler(*fav_args))
