@@ -35,6 +35,6 @@ Long-form content supports including YAML Frontmatter at the top, surrounded bot
 
 This software is licensed under the GNU Lesser General Public License version 3 or later. See the `LICENSE.md` file for details.
 
-* Copyright (C) 2026 Mikita 'rudzik8' Wiśniewski
+* Copyright (C) 2026 Emory Fontana <emory.enby@gmail.com>
 
 For authors, see the `AUTHORS.md` file.
