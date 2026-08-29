@@ -3,10 +3,10 @@ name = "pomeari"
 version = "0.1.0"
 description = "FOSS crossposting software built on humane modular design."
 authors = [
-  {name = "Mikita Wiśniewski", email = "rudzik8@protonmail.com"},
+  {name = "Emory Fontana", email = "emory.enby@gmail.com"},
 ]
 maintainers = [
-  {name = "Mikita Wiśniewski", email = "rudzik8@protonmail.com"},
+  {name = "Emory Fontana", email = "emory.enby@gmail.com"},
 ]
 license = "LGPL-3.0-or-later"
 license-files = ["LICEN[CS]E*", "AUTHORS.md"]
