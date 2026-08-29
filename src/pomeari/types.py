@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from typing import NamedTuple
@@ -31,7 +32,7 @@ class PlatformConfig(NamedTuple):
 @dataclass(slots=True)
 class ModuleInfo:
     """
-    (Optional) information about a Platform implementation.
+    Base information about a Platform implementation module.
     """
 
     title: str | None = None
@@ -54,3 +55,98 @@ class XpostResult:
     created_at: str | None = None
     config_update: dict = field(default_factory=dict)
     metadata: str | None = None
+
+
+class PublishStatus(StrEnum):
+    """
+    Indicates the result of a post publishing attempt, per-run.
+    """
+    SUCCESS = auto()
+    FAILED = auto()
+    SKIPPED = auto()
+
+
+@dataclass(frozen=True, slots=True)
+class PublishRequest:
+    """
+    Representation of a request to publish a post to select or all platform(s).
+    """
+    post_form: PostForm
+    content: str
+    targets: Iterable[str] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PlatformPublishResult:
+    """
+    Representation of a per-platform post publishing result.
+    """
+    platform: str
+    title: str
+    status: PublishStatus
+    result: XpostResult | None = None
+    error: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PublishResult:
+    """
+    Representation of a per-run post publishing result.
+    """
+    run_id: int
+    caption: str
+    platforms: list[PlatformPublishResult]
+
+
+@dataclass(frozen=True, slots=True)
+class PlatformInfo:
+    """
+    Information about a Platform implementation (nests ModuleInfo).
+    """
+    name: str
+    module: ModuleInfo
+    supports_short: bool
+    supports_long: bool
+    configured: bool
+
+
+@dataclass(frozen=True, slots=True)
+class PostLog:
+    """
+    Representation of a post log entry.
+    """
+    platform: str
+    url: str
+    created_at: str | None
+    metadata: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class RunLog:
+    """
+    Representation of a run log entry.
+    """
+    id: int
+    caption: str
+    posts: list[PostLog]
+
+
+@dataclass(frozen=True, slots=True)
+class Draft:
+    """
+    Representation of a draft for a future post.
+    """
+    name: str
+    content: str
+    post_form: PostForm
+    targets: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class DraftSummary:
+    """
+    Summary of a draft entry to be used in UIs.
+    """
+    name: str
+    post_form: PostForm
+    updated_at: str
