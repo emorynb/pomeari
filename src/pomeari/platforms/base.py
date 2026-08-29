@@ -26,8 +26,14 @@ class Platform(ABC):  # no real reason to inherit from ABC here but whatever
     def supports_post_long(self) -> bool:
         return type(self).post_long is not Platform.post_long
 
+    def supports_post_short(self) -> bool:
+        return type(self).post_short is not Platform.post_short
+
     async def post_short(self, content: str, config: dict[str, str]) -> XpostResult:
         raise NotImplementedError
 
     async def post_long(self, post: Post, config: dict[str, str]) -> XpostResult:
         raise NotImplementedError
+
+    async def close(self):
+        pass

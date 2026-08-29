@@ -2,10 +2,10 @@
 Mastodon platform module for Pomeari.
 
 Comes built-in with Pomeari itself intentionally to give an example for how
-entry points are used (see root-level pomeari `pyproject.toml`) and other
-code is supposed to be written, as Mastodon gives a very simple and pleasant API
-for such demonstrations. That being said, this is perfectly good for everyday
-usage. All other platform modules should be placed in external packages.
+entry points are used (see root-level pomeari `pyproject.toml`) and other code
+is supposed to be written, as Mastodon gives a very simple and pleasant API for
+such demonstrations. That being said, this is perfectly good for everyday usage.
+All other platform modules should be placed in external packages.
 """
 
 from datetime import datetime
@@ -73,3 +73,6 @@ class MastodonPlatform(Platform):
         ).isoformat()
 
         return XpostResult(url=data["url"], created_at=created_at)
+
+    async def close(self):
+        await self._client.aclose()
