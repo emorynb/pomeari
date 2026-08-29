@@ -27,6 +27,7 @@ This is all still very WIP (see [#1](https://codeberg.org/rudzik8/pomeari/issues
   e.g. `pomeari post long ~/Documents/my-brother-said.md`, or just `pomeari post [short]`
 * See the crossposts you made using `pomeari post logs [{-n|--max-count} <LIMIT>]`, or just `pomeari post logs`
 * Manage your platforms by using `pomeari platform list` and `pomeari platform favorite [<PLATFORM>]`
+* Reset parts of the database by using `pomeari reset config`, `pomeari reset logs`, or its entirety via `pomeari reset all`
 
 Long-form content supports including YAML Frontmatter at the top, surrounded both ways by triple dash (`---`).
 
