@@ -49,7 +49,9 @@ async def post_to_platforms(
         run_caption = content[:20].rstrip()  # not the best solution but meh
     else:
         post = frontmatter.loads(content)
-        run_caption: str = post["title"] if "title" in post else content[:20].rstrip()  # pyright: ignore
+        run_caption: str = (
+            post["title"] if "title" in post else content[:20].rstrip()
+        )  # pyright: ignore
 
     try:
         await log_run(run_id, run_caption)
@@ -121,11 +123,10 @@ async def post_to_platforms(
             else:
                 logging.warning(
                     "Relay skipped for %s — favorite platform returned: %s",
-                    display_name, fav_result
+                    display_name,
+                    fav_result,
                 )
-                coros[display_name] = _wrap(
-                    run_id, display_name, _raise_ni()
-                )
+                coros[display_name] = _wrap(run_id, display_name, _raise_ni())
         else:
             if post_form == PostForm.LONG:
                 handler = platform.post_long
@@ -134,12 +135,12 @@ async def post_to_platforms(
                 handler = platform.post_short
                 handler_args = (post, stripped)
 
-            coros[display_name] = _wrap(
-                run_id, display_name, handler(*handler_args)
-            )
+            coros[display_name] = _wrap(run_id, display_name, handler(*handler_args))
 
     results = await asyncio.gather(*coros.values(), return_exceptions=True)
-    combined: dict[str, XpostResult | Exception] = dict(zip(coros.keys(), results))  # pyright: ignore
+    combined: dict[str, XpostResult | Exception] = dict(
+        zip(coros.keys(), results)
+    )  # pyright: ignore
     if fav_result is not None:
         combined = {fav_display: fav_result, **combined}
 

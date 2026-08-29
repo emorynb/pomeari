@@ -289,7 +289,7 @@ def reset_all():
         "This includes all your configuration entries (API keys, settings...), "
         "all your run and post logs, and your favorite platform choice.\n"
         "Are you sure you're okay with that?",
-        abort=True
+        abort=True,
     )
 
     DB_PATH.unlink(missing_ok=True)
