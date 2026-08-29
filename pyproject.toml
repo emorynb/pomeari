@@ -35,5 +35,5 @@ longblank = "pomeari.platforms.longblank.platform:LongBlankPlatform"
 mastodon = "pomeari.platforms.mastodon.platform:MastodonPlatform"
 
 [build-system]
-requires = ["flit_core<4"]
+requires = ["flit_core>=4"]
 build-backend = "flit_core.buildapi"
