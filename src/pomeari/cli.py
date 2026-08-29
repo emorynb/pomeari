@@ -239,5 +239,63 @@ def logs(max_count: int):
     asyncio.run(main())
 
 
+@cli.group
+def reset():
+    """Reset (parts of) the local Pomeari database"""
+    pass
+
+
+@reset.command("config")
+def reset_config():
+    """Reset all Pomeari configuration entries."""
+    from .db import clear_table
+
+    click.confirm(
+        "Are you sure you want to LOSE all your configuration entries FOREVER?",
+        abort=True,
+    )
+
+    asyncio.run(clear_table("config"))
+    click.echo(f"Reset all configuration entries.")
+
+
+@reset.command("logs")
+def reset_logs():
+    """Reset all Pomeari run/post log entries."""
+    from .db import clear_table
+
+    click.confirm(
+        "Are you sure you want to LOSE all your run and post logs FOREVER?",
+        abort=True,
+    )
+
+    async def main():
+        await clear_table("run_log")
+        await clear_table("post_log")
+        await clear_table("run_counter")
+        click.echo(f"Reset all run/post log entries.")
+
+    asyncio.run(main())
+
+
+@reset.command("all")
+def reset_all():
+    """Reset the entire Pomeari database."""
+    from pathlib import Path
+    from .db import DB_PATH, init_db
+
+    click.confirm(
+        "You're about to delete the entirety of your Pomeari database. "
+        "This includes all your configuration entries (API keys, settings...), "
+        "all your run and post logs, and your favorite platform choice.\n"
+        "Are you sure you're okay with that?",
+        abort=True
+    )
+
+    DB_PATH.unlink(missing_ok=True)
+    asyncio.run(init_db())
+    click.echo(f"Reset the entire Pomeari database.")
+
+
 if __name__ == "__main__":
     cli()

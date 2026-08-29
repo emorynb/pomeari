@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any
 
@@ -6,10 +7,10 @@ import oschmod
 
 from .types import XpostResult
 
-# a local path is used for the DB intentionally, and yes, one of those
-# intentions is that the API secrets and whatever else that may be found there
-# essentially in plain text are kept local in the user's home catalogue and
-# hopefully kept just as secret as any other sensitive info they may have there.
+# a local path is used for the DB intentionally.
+# one of those intentions is that the API secrets and other stuff stored there
+# essentially in plain text are kept local to the user's home catalogue, which
+# they should be competent enough not to share with anybody in the first place.
 DB_PATH = Path.home() / ".pomeari.db"
 
 
@@ -21,7 +22,6 @@ async def init_db():
     not on the helpers to ensure they're called, but on the one calling the
     helpers.
     """
-    oschmod.set_mode(str(DB_PATH), 0o600)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("PRAGMA foreign_keys = ON;")
         await db.execute("""
@@ -73,6 +73,8 @@ async def init_db():
         """)
 
         await db.commit()
+    if os.name != "nt":
+        oschmod.set_mode(str(DB_PATH), 0o600)
 
 
 async def set_conf(key: str, value: str):
@@ -92,6 +94,19 @@ async def rm_conf(key: str):
     """
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("DELETE FROM config WHERE key = ?", (key,))
+        await db.commit()
+
+
+async def clear_table(table: str):
+    """
+    Delete the contents of a database table.
+
+    WARNING:
+    1. This is obviously dangerous.
+    2. This function should never receive user input.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(f"DELETE FROM {table}")
         await db.commit()
 
 
