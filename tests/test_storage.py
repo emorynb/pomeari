@@ -10,30 +10,6 @@ from pomeari import (
     PomeariService,
     PostForm,
 )
-from pomeari.db import Database
-
-
-def test_migrates_legacy_database_without_removing_it(tmp_path):
-    async def scenario():
-        legacy_path = tmp_path / "legacy.db"
-        legacy = Database(legacy_path)
-        await legacy.initialize()
-        await legacy.set_config("example_key", "example value")
-
-        data_dir = tmp_path / "data"
-        async with PomeariService(
-            data_dir=data_dir,
-            platforms={},
-            legacy_db_path=legacy_path,
-        ) as service:
-            assert await service.get_config() == {"example_key": "example value"}
-
-        assert legacy_path.exists()
-        assert (data_dir / "pomeari.db").exists()
-
-    asyncio.run(scenario())
-
-
 def test_saves_loads_lists_and_deletes_markdown_drafts(tmp_path):
     async def scenario():
         async with PomeariService(tmp_path, {}) as service:

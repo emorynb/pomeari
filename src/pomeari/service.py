@@ -5,7 +5,6 @@ from pathlib import Path
 from .db import (
     DEFAULT_DATA_DIR,
     DEFAULT_DB_PATH,
-    LEGACY_DB_PATH,
     Database,
     prepare_data_dir,
 )
@@ -46,19 +45,9 @@ class PomeariService:
         self,
         data_dir: Path | None = None,
         platforms: Mapping[str, Platform] | None = None,
-        legacy_db_path: Path | None = None,
     ):
-        uses_default_data_dir = data_dir is None
         self.data_dir = data_dir or DEFAULT_DATA_DIR
         self.data_dir = self.data_dir.expanduser()
-
-        if legacy_db_path:
-            self._legacy_db_path = legacy_db_path.expanduser()
-        elif uses_default_data_dir:
-            self._legacy_db_path = LEGACY_DB_PATH
-        else:
-            self._legacy_db_path = None
-
         self.database = Database(self.data_dir / DEFAULT_DB_PATH.name)
         self.drafts = DraftStore(self.data_dir / "drafts")
         self._platforms = dict(platforms) if platforms else None
@@ -70,7 +59,7 @@ class PomeariService:
         Runs automatically when entering the context manager.
         """
 
-        prepare_data_dir(self.data_dir, self._legacy_db_path)
+        prepare_data_dir(self.data_dir)
         await self.database.initialize()
         self.drafts.initialize()
 
