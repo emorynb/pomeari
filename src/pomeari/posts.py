@@ -189,6 +189,29 @@ async def publish_to_platforms(
     config: Mapping[str, str],
     database: Database,
 ) -> PublishResult:
+    """Validate and carry out a ``PublishRequest`` across the supplied
+    ``platforms``.
+
+    If no explicit targets are given, short-form posts go to every compatible
+    platform; long-form posts target *every* platform. Explicit targets are
+    de-duplicated while retaining their original order.
+
+    Short-form posts are published concurrently. For a long-form post, the
+    favorite platform is published to first. Other long-form platforms then
+    receive the full post, while short-only platforms receive a caption and a
+    link to the favorite platform's post to relay. Those relays are skipped if
+    the favorite platform fails.
+
+    The publishing run and every successful platform result are persisted when
+    possible. Logging errors are reported as warnings, and adapter errors are
+    captured in their corresponding ``PlatformPublishResult``. The returned
+    results (``PublishResult`` object) follow the order in which the function
+    received the ``platforms``.
+
+    Invalid content, targets, favorite-platform selection, and missing required
+    configuration raise the corresponding exceptions from ``pomeari.errors``
+    before any posting.
+    """
     selected = _selected_platforms(request, platforms)
     if not selected:
         raise InvalidPostError("No compatible platforms are available.")
