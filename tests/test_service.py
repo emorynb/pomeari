@@ -30,11 +30,13 @@ def test_lists_platform_capabilities_and_configuration(tmp_path):
         async with PomeariService(tmp_path, platforms) as service:
             initial = await service.list_platforms()
             assert [platform.configured for platform in initial] == [True, False, True]
-            assert initial[0].module is platforms["plain"].info
-            assert initial[0].module.title == "Short platform"
-            assert initial[0].supports_short is True
-            assert initial[0].supports_long is False
-            assert initial[2].supports_long is True
+            plain = initial[0]  # pyright: ignore[reportIndexIssue]
+            long_info = initial[2]  # pyright: ignore[reportIndexIssue]
+            assert plain.module is platforms["plain"].info
+            assert plain.module.title == "Short platform"
+            assert plain.supports_short is True
+            assert plain.supports_long is False
+            assert long_info.supports_long is True
 
             await service.set_config("short_token", "secret")
             configured = await service.list_platforms()
@@ -65,7 +67,8 @@ def test_publishes_only_to_selected_platforms(tmp_path):
             assert not unselected.posts
 
             history = await service.get_history()
-            assert history[0].posts[0].platform == "selected"
+            run = history[0]  # pyright: ignore[reportIndexIssue]
+            assert run.posts[0].platform == "selected"
 
     asyncio.run(scenario())
 

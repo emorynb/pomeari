@@ -1,7 +1,8 @@
 import asyncio
-from collections.abc import Awaitable, Iterable
+import sys
+from collections.abc import Coroutine, Iterable
 from importlib.metadata import version
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import click
 
@@ -12,7 +13,7 @@ from .types import PostForm, PublishRequest, PublishStatus, RunLog
 T = TypeVar("T")
 
 
-def _run(operation: Awaitable[T]) -> T:
+def _run(operation: Coroutine[Any, Any, T]) -> T:
     try:
         return asyncio.run(operation)
     except MissingConfigurationError as error:
@@ -134,9 +135,9 @@ def _load_and_maybe_edit_content(
     if message:
         content = message
     elif stdin:
-        if click.get_text_stream("stdin").isatty():
+        if sys.stdin.isatty():
             return None
-        content = click.get_text_stream("stdin").read()
+        content = sys.stdin.read()
     elif file_input:
         with open(file_input, "r", encoding="utf-8") as file:
             content = file.read()

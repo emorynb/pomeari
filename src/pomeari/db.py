@@ -2,7 +2,7 @@ import os
 from collections.abc import Iterable, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, cast
 
 import aiosqlite
 import oschmod
@@ -172,7 +172,9 @@ class Database:
                 row = await cursor.fetchone()
 
             await db.commit()
-            return row[0]  # pyright: ignore
+            if row is None:
+                raise RuntimeError("Run counter is missing from the database.")
+            return cast(int, row[0])
 
     async def log_run(self, run_id: int, caption: str):
         """Persist a publishing ``run_id`` and ``caption`` in the logs."""
@@ -310,7 +312,11 @@ class Database:
                 "SELECT name FROM favorite_platform LIMIT 1"
             ) as cursor:
                 row = await cursor.fetchone()
-                return row[0]  # pyright: ignore
+                if row is None:
+                    raise RuntimeError(
+                        "Favorite platform is missing from the database."
+                    )
+                return cast(str, row[0])
 
     async def set_favorite_platform(self, name: str):
         """Store the supplied favorite platform name.

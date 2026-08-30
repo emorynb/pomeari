@@ -1,5 +1,6 @@
-from frontmatter import Post
 from collections.abc import Mapping
+
+from frontmatter import Post
 
 from pomeari.platforms.base import Platform
 from pomeari.types import ModuleInfo, PlatformConfig, XpostResult

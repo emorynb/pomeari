@@ -32,8 +32,8 @@ def test_saves_loads_lists_and_deletes_markdown_drafts(tmp_path):
             assert loaded_document.content == "The draft body."
 
             summaries = await service.list_drafts()
-            assert len(summaries) == 1
-            assert summaries[0].name == "an essay"
+            assert len(summaries) == 1  # pyright: ignore[reportArgumentType]
+            assert summaries[0].name == "an essay"  # pyright: ignore[reportIndexIssue]
 
             await service.delete_draft("an essay")
             with pytest.raises(DraftNotFoundError):

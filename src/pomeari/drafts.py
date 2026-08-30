@@ -1,7 +1,8 @@
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 import frontmatter
 
@@ -78,8 +79,10 @@ class DraftStore:
         try:
             document = frontmatter.load(path)
             metadata = document.metadata.pop("pomeari")
+            if not isinstance(metadata, Mapping):
+                raise TypeError
             post_form = PostForm(metadata["post_form"])
-            targets = list(metadata["targets"])
+            targets = list(cast(Iterable[str], metadata["targets"]))
         except (KeyError, TypeError, ValueError) as error:
             raise DraftError(f"Draft '{name}' has invalid Pomeari metadata.") from error
 
