@@ -33,9 +33,9 @@ class DraftStore:
             "targets": list(draft.targets),
         }
 
-        temporary_path = path.with_suffix(".md.tmp")
-        temporary_path.write_text(frontmatter.dumps(document), encoding="utf-8")
-        temporary_path.replace(path)
+        temp_path = path.with_suffix(".md.tmp")
+        temp_path.write_text(frontmatter.dumps(document), encoding="utf-8")
+        temp_path.replace(path)
 
     def load(self, name: str) -> Draft:
         path = self._draft_path(name)

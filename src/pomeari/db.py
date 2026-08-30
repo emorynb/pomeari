@@ -15,7 +15,7 @@ DEFAULT_DB_PATH = DEFAULT_DATA_DIR / "pomeari.db"
 LEGACY_DB_PATH = Path.home() / ".pomeari.db"
 
 
-def prepare_data_directory(
+def prepare_data_dir(
     data_dir: Path = DEFAULT_DATA_DIR,
     legacy_path: Path | None = LEGACY_DB_PATH,
 ) -> Path:

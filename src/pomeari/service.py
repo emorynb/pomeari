@@ -7,7 +7,7 @@ from .db import (
     DEFAULT_DB_PATH,
     LEGACY_DB_PATH,
     Database,
-    prepare_data_directory,
+    prepare_data_dir,
 )
 from .drafts import DraftStore
 from .ep import discover_platforms
@@ -48,7 +48,7 @@ class PomeariService:
         self._closed = False
 
     async def initialize(self):
-        prepare_data_directory(self.data_dir, self._legacy_db_path)
+        prepare_data_dir(self.data_dir, self._legacy_db_path)
         await self.database.initialize()
         self.drafts.initialize()
 
