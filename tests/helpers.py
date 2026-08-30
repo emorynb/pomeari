@@ -30,6 +30,46 @@ class ConfiguredShortPlatform(ShortPlatform):
     )
 
 
+class ConfigUpdatingPlatform(Platform):
+    info = ModuleInfo(
+        title="Config-updating platform",
+        config_keys=[
+            PlatformConfig(
+                key="untouched",
+                description="an unchanged value",
+                required=True,
+            ),
+            PlatformConfig(
+                key="replaced",
+                description="a replaced value",
+                required=True,
+            ),
+            PlatformConfig(
+                key="added",
+                description="a newly persisted value",
+                default="default",
+            ),
+        ],
+    )
+
+    def __init__(self):
+        self.posts = []
+
+    def _result(self) -> XpostResult:
+        return XpostResult(
+            url="https://config-updating.example/post",
+            config_update={"replaced": "new", "added": "added"},
+        )
+
+    async def post_short(self, content: str, config: Mapping[str, str]) -> XpostResult:
+        self.posts.append((content, config))
+        return self._result()
+
+    async def post_long(self, post: Post, config: Mapping[str, str]) -> XpostResult:
+        self.posts.append((post, config))
+        return self._result()
+
+
 class LongPlatform(Platform):
     info = ModuleInfo(title="Long platform")
 
