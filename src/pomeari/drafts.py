@@ -10,10 +10,22 @@ from .types import Draft, DraftSummary, PostForm
 
 
 class DraftStore:
+    """File-based store for local drafts.
+
+    Each draft is a Markdown file in the directory configured on construction
+    (``path``). Pomeari-specific state is stored in its ``pomeari`` frontmatter
+    entry.
+    """
+
     def __init__(self, path: Path):
         self.path = path
 
     def initialize(self):
+        """Create the draft storage directory and its parents, if missing.
+
+        Existing storage is left as-is.
+        """
+
         self.path.mkdir(parents=True, exist_ok=True)
 
     def _draft_path(self, name: str) -> Path:
@@ -26,6 +38,14 @@ class DraftStore:
         return self.path / f"{normalized}.md"
 
     def save(self, draft: Draft):
+        """Write a ``Draft`` to ``<normalized-name>.md``.
+
+        The draft's ``content`` is parsed as a frontmatter document. Post form
+        and target list are added under the ``pomeari`` metadata key. The write
+        is done to a temporary file, which is then moved to the destination
+        path.
+        """
+
         path = self._draft_path(draft.name)
         document = frontmatter.loads(draft.content)
         document.metadata["pomeari"] = {
@@ -38,6 +58,19 @@ class DraftStore:
         temp_path.replace(path)
 
     def load(self, name: str) -> Draft:
+        """Load and reconstruct a ``Draft`` by ``name``.
+
+        Pomeari's private metadata is extracted and removed. The stored post
+        form is parsed into ``PostForm``. Any unrelated frontmatter is preserved
+        as part of the returned content.
+
+        The method raises:
+
+        - ``InvalidDraftNameError`` for an unsafe name;
+        - ``DraftNotFoundError`` when the file does not exist;
+        - ``DraftError`` when required Pomeari metadata is absent or invalid.
+        """
+
         path = self._draft_path(name)
         if not path.exists():
             raise DraftNotFoundError(name)
@@ -63,6 +96,13 @@ class DraftStore:
         )
 
     def list(self) -> Iterable[DraftSummary]:
+        """List all valid locally stored drafts as ``DraftSummary`` objects.
+
+        Drafts are sorted by modification time from newest to oldest. Files with
+        invalid Pomeari metadata discovered at runtime are logged and omitted
+        from the returned ``Iterable``.
+        """
+
         drafts = []
         for path in self.path.glob("*.md"):
             try:
@@ -87,6 +127,12 @@ class DraftStore:
         return drafts
 
     def delete(self, name: str):
+        """Delete a ``Draft`` by ``name``.
+
+        Raises ``DraftNotFoundError`` if the file by the normalized ``name``
+        does not exist.
+        """
+
         path = self._draft_path(name)
         if not path.exists():
             raise DraftNotFoundError(name)
