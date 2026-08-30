@@ -1,5 +1,4 @@
 import os
-import shutil
 from collections.abc import Iterable, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,13 +14,9 @@ DEFAULT_DATA_DIR = Path.home() / ".pomeari"
 
 # Default SQLite database location
 DEFAULT_DB_PATH = DEFAULT_DATA_DIR / "pomeari.db"
-LEGACY_DB_PATH = Path.home() / ".pomeari.db"
 
 
-def prepare_data_dir(
-    data_dir: Path = DEFAULT_DATA_DIR,
-    legacy_path: Path | None = LEGACY_DB_PATH,
-) -> Path:
+def prepare_data_dir(data_dir: Path = DEFAULT_DATA_DIR) -> Path:
     """Create the selected data directory and return its database path.
 
     On non-Windows systems, the data directory is restricted to mode
@@ -29,11 +24,6 @@ def prepare_data_dir(
     """
     data_dir.mkdir(parents=True, exist_ok=True)
     db_path = data_dir / DEFAULT_DB_PATH.name
-
-    if not db_path.exists() and legacy_path and legacy_path.exists():
-        temp_path = db_path.with_suffix(".db.migrating")
-        shutil.copy2(legacy_path, temp_path)
-        temp_path.replace(db_path)
 
     if os.name != "nt":
         oschmod.set_mode(str(data_dir), 0o700)
