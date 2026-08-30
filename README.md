@@ -1,6 +1,6 @@
 # Pomeari
 
-[![License: LGPLv3+](https://img.shields.io/badge/License-LGPLv3+-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
+[![License: LGPLv3+](https://img.shields.io/badge/license-LGPLv3+-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 _Short for **Po**st-**Me**-**a**-**Ri**ver!_
@@ -8,9 +8,7 @@ _Short for **Po**st-**Me**-**a**-**Ri**ver!_
 FOSS crossposting software built on humane modular design.
 
 
-## Getting Started
-
-### Installation
+## Installation
 
 This is all still very WIP (see [#1](https://codeberg.org/rudzik8/pomeari/issues/1) for details), so it's recommended that you only perform a toy install within the `uv` virtual environment.
 
@@ -20,7 +18,7 @@ This is all still very WIP (see [#1](https://codeberg.org/rudzik8/pomeari/issues
 4. Confirm that it worked using `uv run pomeari`
 
 
-### Usage
+## Usage
 
 * Add/remove configuration entries (including API secrets) using `pomeari config {set|rm} <key> [<value>]`\
   e.g. `pomeari config set mastodon_token uQL3g0C7h5wvcyQbt5vNFGPxt2tPTe`
@@ -33,10 +31,16 @@ This is all still very WIP (see [#1](https://codeberg.org/rudzik8/pomeari/issues
 Long-form content supports including YAML Frontmatter at the top, surrounded both ways by triple dash (`---`).
 
 
-### License
+## Development
 
-This software is licensed under the GNU Lesser General Public License version 3 or later. See the `LICENSE.md` file for details.
+* `uv run --group dev pytest` to run the [`tests/`](tests/)
+* `uv run --group dev black src` to format code
+
+
+## License
+
+This software is licensed under the GNU Lesser General Public License version 3 or later. See [`LICENSE.md`](LICENSE.md) for details.
 
 * Copyright (C) 2026 Emory Fontana <emory.enby@gmail.com>
 
-For authors, see the `AUTHORS.md` file.
+For authors, see [`AUTHORS.md`](AUTHORS.md).
