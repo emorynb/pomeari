@@ -2,12 +2,17 @@ from mistletoe.markdown_renderer import MarkdownRenderer
 
 
 class PlaintextRenderer(MarkdownRenderer):
-    """
-    A plaintext mistletoe renderer. Useful for platforms that don't support
-    text formatting.
+    """Placeholder for a converter of Markdown-formatted rich text into plain
+    text.
 
-    Inherits from Markdown as it's one of the rare markup languages designed to
-    be readable when viewed as plaintext. TODO: actually implement it lol
+    This renderer is intended to convert Markdown into plain text for platforms
+    that do not support rich text. ``MastodonPlatform`` currently uses it when
+    preparing content for an instance believed not to support Markdown.
+
+    Right now, this class inherits
+    ``mistletoe.markdown_renderer.MarkdownRenderer`` unchanged, which means that
+    it still renders Markdown syntax rather than stripping formatting. In the
+    future, this functionality should get implemented.
     """
 
     pass
