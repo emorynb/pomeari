@@ -31,7 +31,7 @@ def _selected_platforms(
     request: PublishRequest,
     platforms: Mapping[str, Platform],
 ) -> Iterable[str]:
-    if request.targets is None:
+    if not request.targets:
         if request.post_form == PostForm.SHORT:
             return [
                 name
@@ -288,10 +288,7 @@ async def publish_to_platforms(
         platform = platforms[name]
         if platform.supports_post_long():
             handler = platform.post_long(post, platform_configs[name])  # type: ignore[arg-type]
-        elif (
-            favorite_result.status == PublishStatus.SUCCESS
-            and favorite_result.result is not None
-        ):
+        elif favorite_result.status == PublishStatus.SUCCESS and favorite_result.result:
             relay_content = f"{caption}\n\n{favorite_result.result.url}"
             handler = platform.post_short(relay_content, platform_configs[name])
         else:
