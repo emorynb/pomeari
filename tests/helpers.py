@@ -1,4 +1,5 @@
 from frontmatter import Post
+from collections.abc import Mapping
 
 from pomeari.platforms.base import Platform
 from pomeari.types import ModuleInfo, PlatformConfig, XpostResult
@@ -11,7 +12,7 @@ class ShortPlatform(Platform):
         self.url = url
         self.posts = []
 
-    async def post_short(self, content: str, config: dict[str, str]) -> XpostResult:
+    async def post_short(self, content: str, config: Mapping[str, str]) -> XpostResult:
         self.posts.append((content, config))
         return XpostResult(url=self.url)
 
@@ -36,7 +37,7 @@ class LongPlatform(Platform):
         self.url = url
         self.posts = []
 
-    async def post_long(self, post: Post, config: dict[str, str]) -> XpostResult:
+    async def post_long(self, post: Post, config: Mapping[str, str]) -> XpostResult:
         self.posts.append((post, config))
         return XpostResult(url=self.url)
 
@@ -44,5 +45,5 @@ class LongPlatform(Platform):
 class FailingLongPlatform(Platform):
     info = ModuleInfo(title="Failing long platform")
 
-    async def post_long(self, post: Post, config: dict[str, str]) -> XpostResult:
+    async def post_long(self, post: Post, config: Mapping[str, str]) -> XpostResult:
         raise RuntimeError("primary platform rejected the post")

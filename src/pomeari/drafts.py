@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -61,7 +62,7 @@ class DraftStore:
             targets=targets,
         )
 
-    def list(self) -> list[DraftSummary]:
+    def list(self) -> Iterable[DraftSummary]:
         drafts = []
         for path in self.path.glob("*.md"):
             try:

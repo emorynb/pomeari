@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from collections.abc import Iterable
 
 
 class PomeariError(Exception):
@@ -28,11 +29,11 @@ class MissingConfigEntry:
 
 
 class MissingConfigurationError(PomeariError):
-    def __init__(self, entries: list[MissingConfigEntry]):
-        self.entries = entries.copy()
+    def __init__(self, entries: Iterable[MissingConfigEntry]):
+        self.entries = list(entries)
 
         lines = []
-        for entry in entries:
+        for entry in self.entries:
             lines.append(
                 f"{entry.platform_title}: missing config entry "
                 f"'{entry.key}' ({entry.description})"

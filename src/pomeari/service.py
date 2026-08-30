@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from .db import (
@@ -55,12 +55,12 @@ class PomeariService:
         if not self._platforms:
             self._platforms = discover_platforms()
 
-    def _available_platforms(self) -> dict[str, Platform]:
+    def _available_platforms(self) -> Mapping[str, Platform]:
         if not self._platforms:
             raise RuntimeError("PomeariService.initialize() must be called first.")
         return self._platforms
 
-    async def list_platforms(self) -> list[PlatformInfo]:
+    async def list_platforms(self) -> Iterable[PlatformInfo]:
         config = await self.database.load_config()
         platform_infos = []
 
@@ -84,7 +84,7 @@ class PomeariService:
 
         return platform_infos
 
-    async def get_config(self) -> dict[str, str]:
+    async def get_config(self) -> Mapping[str, str]:
         return await self.database.load_config()
 
     async def set_config(self, key: str, value: str):
@@ -115,7 +115,7 @@ class PomeariService:
             database=self.database,
         )
 
-    async def get_history(self, limit: int = 100) -> list[RunLog]:
+    async def get_history(self, limit: int = 100) -> Iterable[RunLog]:
         return await self.database.get_history(limit)
 
     async def clear_history(self):
@@ -130,7 +130,7 @@ class PomeariService:
     async def load_draft(self, name: str) -> Draft:
         return self.drafts.load(name)
 
-    async def list_drafts(self) -> list[DraftSummary]:
+    async def list_drafts(self) -> Iterable[DraftSummary]:
         return self.drafts.list()
 
     async def delete_draft(self, name: str):
