@@ -10,7 +10,7 @@ FOSS crossposting software built on humane modular design.
 
 ## Installation
 
-This is all still very WIP (see [#1](https://codeberg.org/rudzik8/pomeari/issues/1) for details), so it's recommended that you only perform a toy install within the `uv` virtual environment.
+This is all still very WIP (see [#1](https://github.com/emorynb/pomeari/issues/1) for details), so it's recommended that you only perform a toy install within the `uv` virtual environment.
 
 1. [Install Astral uv](https://docs.astral.sh/uv/getting-started/installation/)
 2. Run `uv sync` to fetch the dependencies
