@@ -170,6 +170,12 @@ async def _run_handler(
         )
 
     try:
+        for key, value in result.config_update.items():
+            await database.set_config(key, value)
+    except Exception as error:
+        logging.warning("Failed to update config for %s: %s", title, error)
+
+    try:
         await database.log_post(run_id, name, result)
     except Exception as error:
         logging.warning("Failed to log post for %s: %s", title, error)

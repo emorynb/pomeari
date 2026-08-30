@@ -12,6 +12,7 @@ from pomeari import (
 )
 
 from .helpers import (
+    ConfigUpdatingPlatform,
     ConfiguredShortPlatform,
     FailingLongPlatform,
     LongPlatform,
@@ -83,6 +84,44 @@ def test_validates_configuration_for_selected_platforms(tmp_path):
                 await service.publish(request)
 
             assert caught.value.entries[0].key == "short_token"
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("post_form", "content"),
+    [
+        (PostForm.SHORT, "A short config-updating post."),
+        (PostForm.LONG, "A long config-updating post."),
+    ],
+)
+def test_persists_platform_config_updates(tmp_path, post_form, content):
+    async def scenario():
+        platform = ConfigUpdatingPlatform()
+        async with PomeariService(tmp_path, {"updating": platform}) as service:
+            await service.set_config("untouched", "same")
+            await service.set_config("replaced", "old")
+            if post_form == PostForm.LONG:
+                await service.set_favorite_platform("updating")
+
+            await service.publish(
+                PublishRequest(
+                    post_form=post_form,
+                    content=content,
+                    targets=("updating",),
+                )
+            )
+
+            assert platform.posts[0][1] == {
+                "untouched": "same",
+                "replaced": "old",
+                "added": "default",
+            }
+            assert await service.get_config() == {
+                "untouched": "same",
+                "replaced": "new",
+                "added": "added",
+            }
 
     asyncio.run(scenario())
 
