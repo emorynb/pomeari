@@ -9,6 +9,7 @@ All other platform modules should be placed in external packages.
 """
 
 from datetime import datetime
+from collections.abc import Mapping
 from typing import Any
 
 from httpx import AsyncClient
@@ -43,7 +44,7 @@ class MastodonPlatform(Platform):
     def __init__(self) -> None:
         self._client = AsyncClient(timeout=10)
 
-    async def post_short(self, content: str, config: dict[str, Any]) -> XpostResult:
+    async def post_short(self, content: str, config: Mapping[str, Any]) -> XpostResult:
         url = f"{config['mastodon_instance']}/api/v1/statuses"
         headers = {
             "Authorization": f"Bearer {config['mastodon_token']}",

@@ -1,5 +1,6 @@
 import os
 import shutil
+from collections.abc import Iterable, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
@@ -118,7 +119,7 @@ class Database:
             await db.execute("DELETE FROM config")
             await db.commit()
 
-    async def load_config(self) -> dict[str, str]:
+    async def load_config(self) -> Mapping[str, str]:
         config = {}
         async with self.connect() as db:
             async with db.execute("SELECT key, value FROM config") as cursor:
@@ -168,7 +169,7 @@ class Database:
             )
             await db.commit()
 
-    async def get_post_logs(self, limit: int = 100) -> list[dict]:
+    async def get_post_logs(self, limit: int = 100) -> Iterable[Mapping[str, object]]:
         async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             query = """
@@ -181,7 +182,7 @@ class Database:
                 rows = await cursor.fetchall()
                 return [dict(row) for row in rows]
 
-    async def get_run_logs(self, limit: int = 100) -> dict[int, str]:
+    async def get_run_logs(self, limit: int = 100) -> Mapping[int, str]:
         async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             query = """
@@ -194,7 +195,7 @@ class Database:
                 rows = await cursor.fetchall()
                 return {row["id"]: row["caption"] for row in rows}
 
-    async def get_history(self, limit: int = 100) -> list[RunLog]:
+    async def get_history(self, limit: int = 100) -> Iterable[RunLog]:
         async with self.connect() as db:
             db.row_factory = aiosqlite.Row
             run_query = """

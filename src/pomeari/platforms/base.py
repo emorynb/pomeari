@@ -1,4 +1,5 @@
 from abc import ABC
+from collections.abc import Mapping
 
 from frontmatter import Post
 
@@ -29,10 +30,10 @@ class Platform(ABC):  # no real reason to inherit from ABC here but whatever
     def supports_post_short(self) -> bool:
         return type(self).post_short is not Platform.post_short
 
-    async def post_short(self, content: str, config: dict[str, str]) -> XpostResult:
+    async def post_short(self, content: str, config: Mapping[str, str]) -> XpostResult:
         raise NotImplementedError
 
-    async def post_long(self, post: Post, config: dict[str, str]) -> XpostResult:
+    async def post_long(self, post: Post, config: Mapping[str, str]) -> XpostResult:
         raise NotImplementedError
 
     async def close(self):

@@ -30,7 +30,7 @@ def _platform_title(name: str, platform: Platform) -> str:
 def _selected_platforms(
     request: PublishRequest,
     platforms: Mapping[str, Platform],
-) -> list[str]:
+) -> Iterable[str]:
     if request.targets is None:
         if request.post_form == PostForm.SHORT:
             return [
@@ -56,7 +56,7 @@ def _selected_platforms(
 def _validate_favorite(
     request: PublishRequest,
     platforms: Mapping[str, Platform],
-    selected: list[str],
+    selected: Iterable[str],
     favorite_name: str,
 ):
     if request.post_form != PostForm.LONG:
@@ -85,7 +85,7 @@ def _platform_configs(
     selected: Iterable[str],
     platforms: Mapping[str, Platform],
     config: Mapping[str, str],
-) -> dict[str, dict[str, str]]:
+) -> Mapping[str, Mapping[str, str]]:
     missing = []
     stripped_configs = {}
 
