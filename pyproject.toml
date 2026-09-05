@@ -24,7 +24,6 @@ dependencies = [
 
 [tool.setuptools]
 packages = ["pomeari"]
-package-dir = {"" = "src"}
 
 [dependency-groups]
 dev = [
