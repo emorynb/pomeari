@@ -1,0 +1,24 @@
+site_name: Pomeari
+site_description: FOSS crossposting software built on humane modular design.
+site_url: https://emorynb.github.io/pomeari/
+
+repo_name: emorynb/pomeari
+repo_url: https://github.com/emorynb/pomeari
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+
+nav:
+  - Home: index.md

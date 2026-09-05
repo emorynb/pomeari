@@ -36,6 +36,7 @@ Long-form content supports including YAML Frontmatter at the top, surrounded bot
 * `uv run --group dev pytest` to run the [`tests/`](tests/)
 * `uv run --group dev pyright` to type-check code
 * `uv run --group dev black pomeari` to format code
+* `python -m pip install -r docs/requirements.txt` and `mkdocs serve` to preview documentation
 
 
 ## License

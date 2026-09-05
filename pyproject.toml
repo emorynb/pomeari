@@ -12,18 +12,20 @@ license = "LGPL-3.0-or-later"
 license-files = ["LICEN[CS]E*", "AUTHORS.md"]
 readme = "README.md"
 requires-python = ">=3.12"
+classifiers = [
+    "Environment :: Console",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "aiosqlite>=0.22.1",
     "click>=8.5.0",
-    "flit-core>=4.0.2",
     "httpx>=0.28.1",
     "mistletoe>=1.6.0",
     "oschmod>=0.3.12",
     "python-frontmatter>=1.3.0",
 ]
-
-[tool.setuptools]
-packages = ["pomeari"]
 
 [dependency-groups]
 dev = [
@@ -43,6 +45,12 @@ emptyshort = "pomeari.platforms.emptyshort.platform:EmptyShortPlatform"
 longblank = "pomeari.platforms.longblank.platform:LongBlankPlatform"
 mastodon = "pomeari.platforms.mastodon.platform:MastodonPlatform"
 
+[project.urls]
+Homepage = "https://github.com/emorynb/pomeari"
+Documentation = "https://emorynb.github.io/pomeari/"
+Repository = "https://github.com/emorynb/pomeari"
+Issues = "https://github.com/emorynb/pomeari/issues"
+
 [build-system]
-requires = ["flit_core>=4"]
+requires = ["flit_core>=4,<5"]
 build-backend = "flit_core.buildapi"
