@@ -47,8 +47,10 @@ class Database:
 
         Use:
 
-            async with Database().connect as db:
-                ...
+        ```py
+        async with Database().connect() as db:
+            ...
+        ```
         """
 
         db = await aiosqlite.connect(self.path)
@@ -62,8 +64,7 @@ class Database:
         """Execute the database initialization steps. Runs automatically when
         entering the ``connect`` context manager.
 
-        The parent directory and schema tables are created if missing. The
-        favorite platform gets defaulted to ``mastodon``.
+        The parent directory and schema tables are created if missing.
 
         On non-Windows systems, the database file created by this method is
         restricted to mode ``0600``.
@@ -112,11 +113,6 @@ class Database:
                 CREATE TABLE IF NOT EXISTS favorite_platform (
                     name TEXT NOT NULL
                 );
-            """)
-            await db.execute("""
-                INSERT INTO favorite_platform (name)
-                SELECT 'mastodon'
-                WHERE NOT EXISTS (SELECT 1 FROM favorite_platform);
             """)
             await db.commit()
 
@@ -314,7 +310,9 @@ class Database:
                 row = await cursor.fetchone()
                 if row is None:
                     raise RuntimeError(
-                        "Favorite platform is missing from the database."
+                        "Favorite platform is missing from the database.\n"
+                        "You need to set one up first:\n"
+                        "    pomeari platform favorite telegraph"
                     )
                 return cast(str, row[0])
 
