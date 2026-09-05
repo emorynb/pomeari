@@ -127,20 +127,17 @@ def _load_and_maybe_edit_content(
     *,
     file_input: str | None = None,
     message: str | None = None,
-    stdin: bool = False,
     edit: bool = False,
 ) -> str | None:
     content = ""
 
     if message:
         content = message
-    elif stdin:
-        if sys.stdin.isatty():
-            return None
-        content = sys.stdin.read()
     elif file_input:
         with open(file_input, "r", encoding="utf-8") as file:
             content = file.read()
+    elif not sys.stdin.isatty():
+        content = sys.stdin.read()
 
     if edit or not content:
         edited = click.edit(content)
@@ -192,7 +189,6 @@ def _post_content(
 @post.command
 @click.argument("file_input", required=False, type=click.Path(exists=True))
 @click.option("-m", "--message", help="Post content directly from the command line.")
-@click.option("--stdin", is_flag=True, help="Read post content from stdin.")
 @click.option("-e", "--edit", is_flag=True, help="Edit content before posting.")
 @click.option(
     "-t",
@@ -201,12 +197,11 @@ def _post_content(
     multiple=True,
     help="Post to this platform. Repeat to select multiple platforms.",
 )
-def short(file_input, message, stdin, edit, targets):
+def short(file_input, message, edit, targets):
     """Post short-form content."""
     content = _load_and_maybe_edit_content(
         file_input=file_input,
         message=message,
-        stdin=stdin,
         edit=edit,
     )
     _post_content(PostForm.SHORT, content, targets)
@@ -214,7 +209,6 @@ def short(file_input, message, stdin, edit, targets):
 
 @post.command
 @click.argument("file_input", required=False, type=click.Path(exists=True))
-@click.option("--stdin", is_flag=True, help="Read post content from stdin.")
 @click.option("-e", "--edit", is_flag=True, help="Edit content before posting.")
 @click.option(
     "-t",
@@ -223,11 +217,10 @@ def short(file_input, message, stdin, edit, targets):
     multiple=True,
     help="Post to this platform. Repeat to select multiple platforms.",
 )
-def long(file_input, stdin, edit, targets):
+def long(file_input, edit, targets):
     """Post long-form content."""
     content = _load_and_maybe_edit_content(
         file_input=file_input,
-        stdin=stdin,
         edit=edit,
     )
     _post_content(PostForm.LONG, content, targets)
