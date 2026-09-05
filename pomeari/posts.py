@@ -221,7 +221,12 @@ async def publish_to_platforms(
     """
     selected = _selected_platforms(request, platforms)
     if not selected:
-        raise InvalidPostError("No compatible platforms are available.")
+        raise InvalidPostError(
+            "No compatible platforms are available.\n\n"
+            "If this is your first time using Pomeari, you need to install "
+            "appropriate platform extensions first.\n"
+            "Try `pomeari-mastodon` or `pomeari-telegraph`!"
+        )
 
     _validate_favorite(request, platforms, selected, favorite_name)
     config_targets = selected

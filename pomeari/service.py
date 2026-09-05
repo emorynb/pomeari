@@ -67,7 +67,7 @@ class PomeariService:
             self._platforms = discover_platforms()
 
     def _available_platforms(self) -> Mapping[str, Platform]:
-        if not self._platforms:
+        if self._platforms is None:
             raise RuntimeError("PomeariService.initialize() must be called first.")
         return self._platforms
 

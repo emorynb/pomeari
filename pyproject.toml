@@ -40,11 +40,6 @@ target-version = ["py312"]
 [project.scripts]
 pomeari = "pomeari.cli:cli"
 
-[project.entry-points."pomeari.platforms"]
-emptyshort = "pomeari.platforms.emptyshort.platform:EmptyShortPlatform"
-longblank = "pomeari.platforms.longblank.platform:LongBlankPlatform"
-mastodon = "pomeari.platforms.mastodon.platform:MastodonPlatform"
-
 [project.urls]
 Homepage = "https://github.com/emorynb/pomeari"
 Documentation = "https://emorynb.github.io/pomeari/"
